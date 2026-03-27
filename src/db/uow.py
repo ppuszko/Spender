@@ -1,7 +1,11 @@
 from sqlalchemy.ext.asyncio import async_sessionmaker
-from sqlalchemy.ext.asyncio.session import AsyncSession
+from sqlmodel.ext.asyncio.session import AsyncSession
 from fastapi import HTTPException, Request
 
+from functools import cached_property
+
+from src.api.user.service import UserService
+from src.api.vault.service import VaultService
 
 class UnitOfWork:
     def __init__(self, sessionmaker: async_sessionmaker):
@@ -30,6 +34,15 @@ class UnitOfWork:
                 detail="Unit of Work session object used out of context.")
         return self._session 
     
+
+    @cached_property
+    def vaults(self) -> VaultService:
+        return VaultService(self.session)
+    
+
+    @cached_property
+    def users(self) -> UserService:
+        return UserService(self.session)
 
 def get_uow(request: Request):
     return UnitOfWork(request.app.state.sessionmaker)
