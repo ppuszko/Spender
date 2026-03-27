@@ -8,8 +8,8 @@ from sqlmodel import SQLModel
 
 from alembic import context
 
-from config.db import DBConfig
-from db import models
+from src.config.db import DBConfig
+from src.db import models
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
