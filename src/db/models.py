@@ -1,5 +1,6 @@
 from sqlmodel import SQLModel, Field, Relationship, Enum as PgEnum 
 from sqlalchemy import Column, DateTime, func 
+from fastapi_users.db import SQLAlchemyBaseUserTableUUID
 
 from uuid import UUID 
 from uuid6 import uuid7 
@@ -12,12 +13,10 @@ class UserRole(str, Enum):
     ADMIN = "ADMIN",
     USER = "USER"
 
-class BaseSQLModel(SQLModel):
-    uid: UUID = Field(default_factory=uuid7, primary_key=True)
 
-
-class Vault(BaseSQLModel, table=True):
+class Vault(SQLModel, table=True):
     __tablename__: str = "vaults"
+    id: UUID = Field(default_factory=uuid7, primary_key=True)
     name: str = Field(nullable=False)
     monthly_limit: Decimal = Field(
         default=0,
@@ -26,9 +25,10 @@ class Vault(BaseSQLModel, table=True):
     )
 
 
-class Category(BaseSQLModel, table=True):
+class Category(SQLModel, table=True):
     __tablename__: str = "categories"
-    vault_uid: UUID = Field(foreign_key="vaults.uid", index=True)
+    id: UUID = Field(default_factory=uuid7, primary_key=True)
+    vault_id: UUID = Field(foreign_key="vaults.id", index=True)
     name: str = Field(nullable=False)
     monthly_limit: Decimal = Field(
         default=0,
@@ -36,10 +36,12 @@ class Category(BaseSQLModel, table=True):
         decimal_places=2)
     
 
-class Transaction(BaseSQLModel, table=True):
+class Transaction(SQLModel, table=True):
     __tablename__: str = "transactions"
-    category_uid: UUID = Field(foreign_key="categories.uid")
-    vault_uid: UUID = Field(foreign_key="vaults.uid")
+    id: UUID = Field(default_factory=uuid7, primary_key=True)
+    category_id: UUID = Field(foreign_key="categories.id")
+    vault_id: UUID = Field(foreign_key="vaults.id")
+    user_id: UUID = Field(foreign_key="users.id")
     date: datetime = Field(sa_column=Column(
         DateTime(timezone=True),
         nullable=False,
@@ -50,18 +52,22 @@ class Transaction(BaseSQLModel, table=True):
                             decimal_places=2)
     
 
-class User(BaseSQLModel, table=True):
+class User(SQLModel, table=True):
     __tablename__: str = "users"
+    id: UUID = Field(default_factory=uuid7, primary_key=True)
     name: str = Field(nullable=False)
     email: EmailStr = Field(nullable=False, unique=True)
-    password_hash: str = Field(nullable=False, exclude=True, repr=False)
+    hashed_password: str = Field(nullable=False, exclude=True, repr=False)
+    is_active: bool = Field(nullable=True, default=True)
+    is_superuser: bool = Field(nullable=False, default=True)
+    is_verified: bool = Field(nullable=False, default=True)
     
 
 
 class UserToVault(SQLModel, table=True):
     __tablename__: str = "users_to_vaults"
-    user_uid: UUID = Field(foreign_key="users.uid", primary_key=True)
-    vault_uid: UUID = Field(foreign_key="vaults.uid", primary_key=True, index=True)
+    user_id: UUID = Field(foreign_key="users.id", primary_key=True)
+    vault_id: UUID = Field(foreign_key="vaults.id", primary_key=True, index=True)
     role: UserRole = Field(sa_column=Column(
         PgEnum(UserRole, name="user_role"),
         nullable=False,

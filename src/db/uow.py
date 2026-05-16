@@ -1,48 +1,57 @@
 from sqlalchemy.ext.asyncio import async_sessionmaker
 from sqlmodel.ext.asyncio.session import AsyncSession
-from fastapi import HTTPException, Request
+from fastapi import HTTPException, Request, Depends
 
 from functools import cached_property
+from collections.abc import AsyncGenerator, AsyncIterator
 
-from src.api.user.service import UserService
+from src.api.users.service import UserService
 from src.api.vault.service import VaultService
 
+
 class UnitOfWork:
-    def __init__(self, sessionmaker: async_sessionmaker):
+    def __init__(self, sessionmaker: async_sessionmaker[AsyncSession]):
         self._sessionmaker = sessionmaker
         self._session: AsyncSession | None = None
 
-    async def __aenter__(self):
+    async def __aenter__(self) -> "UnitOfWork":
         self._session = self._sessionmaker()
         return self
     
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
+    async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
         if self._session:
-            if exc_val:
-                await self._session.rollback()
-            else:
-                await self._session.commit()
-
-            await self._session.close()
-            self._session = None 
+            try:
+                if exc_val:
+                    await self._session.rollback()
+                else:
+                    await self._session.commit()
+            finally:
+                await self._session.close()
+                self._session = None 
 
     @property
-    def session(self):
+    def session(self) -> AsyncSession:
         if self._session is None:
-            raise HTTPException(
-                status_code=500, 
-                detail="Unit of Work session object used out of context.")
+            raise RuntimeError("Unit of Work session object used out of context.")
         return self._session 
     
-
-    @cached_property
+    @property
     def vaults(self) -> VaultService:
         return VaultService(self.session)
     
-
-    @cached_property
+    @property
     def users(self) -> UserService:
         return UserService(self.session)
 
-def get_uow(request: Request):
-    return UnitOfWork(request.app.state.sessionmaker)
+async def get_uow(request: Request) -> AsyncIterator[UnitOfWork]:
+    sessionmaker = getattr(request.app.state, "sessionmaker", None)
+    if sessionmaker is None:
+        raise RuntimeError("Sessionmaker not initialized")
+    
+    uow = UnitOfWork(sessionmaker)
+    async with uow:
+        yield uow
+
+async def get_session_from_uow(uow: UnitOfWork = Depends(get_uow)) -> AsyncGenerator[AsyncSession, None]:
+    async with uow:
+        yield uow.session 

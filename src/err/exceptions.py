@@ -8,9 +8,13 @@ class AppException(HTTPException):
         self.status_code = status_code
 
 class NotFoundException(AppException):
-    def __init__(self, detail="Resource not found"):
+    def __init__(self, detail="Resource not found."):
         super().__init__(detail=detail, status_code=status.HTTP_404_NOT_FOUND)
         
 class ForbiddenException(AppException):
-    def __init__(self, detail="Access denied"):
-        super().__init__(status_code=status.HTTP_403_FORBIDDEN, detail=detail)
+    def __init__(self, detail="Access denied."):
+        super().__init__(detail=detail, status_code=status.HTTP_403_FORBIDDEN)
+
+class ServiceMissingException(AppException):
+    def __init__(self, detail="Service missing."):
+        super().__init__(detail=detail, status_code=status.HTTP_503_SERVICE_UNAVAILABLE)
